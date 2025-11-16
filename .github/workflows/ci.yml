@@ -42,5 +42,6 @@ jobs:
           components: rustfmt
 
       - name: Build contracts
+        working-directory: contracts
         run: |
-          cargo build --release -p donation_registry -p ngo_verification -p impact_escrow -p token_manager
+          cargo build --release --target wasm32-unknown-unknown
