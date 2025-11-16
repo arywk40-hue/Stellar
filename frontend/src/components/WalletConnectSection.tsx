@@ -1,17 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
 
-declare global {
-  interface Window {
-    freighterApi?: {
-      isConnected: () => Promise<boolean>;
-      getUserInfo: () => Promise<{ publicKey: string }>;
-      requestAccess: () => Promise<void>;
-      signTransaction: (xdr: string, opts: any) => Promise<string>;
-    };
-  }
-}
-
 export default function WalletConnectSection() {
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [network, setNetwork] = useState<string>(process.env.NEXT_PUBLIC_NETWORK || 'testnet');
