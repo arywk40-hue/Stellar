@@ -1,0 +1,29 @@
+# Node
+node_modules/
+.npm/
+.pnpm-store/
+
+# Rust
+/target/
+Cargo.lock
+
+# Logs
+*.log
+logs/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+
+# Next.js
+.next/
+out/
+.vercel/
+
+# Editor
+.vscode/
+.idea/

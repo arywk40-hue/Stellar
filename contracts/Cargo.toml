@@ -1,0 +1,9 @@
+[workspace]
+members = [
+    "donation_registry",
+    "ngo_verification",
+    "impact_escrow",
+    "token_manager",
+    "nft_minting"
+]
+resolver = "2"

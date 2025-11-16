@@ -1,0 +1,49 @@
+"use client";
+import { useState, useEffect } from 'react';
+import { z } from 'zod';
+import { getRole } from '../lib/auth';
+
+const projectSchema = z.object({ name: z.string().min(2), ngo_id: z.number(), description: z.string().optional() });
+
+export default function ProjectSection() {
+  const [projects, setProjects] = useState<any[]>([]);
+  const [form, setForm] = useState({ name: '', ngo_id: '', description: '' });
+  const [errors, setErrors] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  async function load() {
+    try { const res = await fetch('/api/projects'); if (res.ok) setProjects(await res.json()); } catch {}
+  }
+  useEffect(() => { load(); const id = setInterval(load, 15000); return () => clearInterval(id); }, []);
+
+  async function submit(e: any) {
+    e.preventDefault();
+    const parsed = projectSchema.safeParse({ name: form.name, ngo_id: parseInt(form.ngo_id), description: form.description || undefined });
+    if (!parsed.success) { setErrors(parsed.error.issues.map(i => i.message)); return; }
+    setErrors([]); setLoading(true);
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('geoledger_token') : null;
+      const res = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }, body: JSON.stringify(parsed.data) });
+      if (!res.ok) setErrors(['failed']); else { setForm({ name: '', ngo_id: '', description: '' }); load(); }
+    } catch { setErrors(['network']); }
+    finally { setLoading(false); }
+  }
+
+  return <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <h3>Projects</h3>
+    <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <input placeholder="Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+      <input placeholder="NGO ID" value={form.ngo_id} onChange={e => setForm(f => ({ ...f, ngo_id: e.target.value }))} />
+      <input placeholder="Description" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+      <button disabled={loading}>Create</button>
+      {errors.length > 0 && <div style={{ color: 'red', fontSize: 12 }}>{errors.join(', ')}</div>}
+    </form>
+    <div style={{ maxHeight: 140, overflow: 'auto', border: '1px solid #ddd', padding: 6 }}>
+      {projects.length === 0 && <div style={{ fontSize: 12 }}>No projects.</div>}
+      {projects.map(p => <div key={p.id} style={{ fontSize: 11, display: 'flex', justifyContent: 'space-between' }}>
+        <span>{p.name}</span>
+        <span>NGO {p.ngo_id}</span>
+      </div>)}
+    </div>
+  </div>;
+}

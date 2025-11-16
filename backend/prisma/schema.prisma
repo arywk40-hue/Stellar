@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Donation {
+  id                 Int      @id @default(autoincrement())
+  donor_public_key   String
+  amount             Float
+  ngo_id             Int
+  project_id         Int?
+  donor_lat          Float
+  donor_lng          Float
+  recipient_lat      Float?
+  recipient_lng      Float?
+  status             String
+  chain_create_tx    String?
+  chain_verify_tx    String?
+  soroban_contract_id String?
+  evidence_url       String?
+  tx_confirmed       Boolean  @default(false)
+  created_at         DateTime @default(now())
+}
+
+model NGO {
+  id                  Int      @id @default(autoincrement())
+  name                String
+  wallet_address      String
+  verification_status String
+  sector              String?
+  impact_metrics      Json?
+  locations           Json?
+  created_at          DateTime @default(now())
+}
+
+model Project {
+  id           Int      @id @default(autoincrement())
+  name         String
+  description  String?
+  ngo_id       Int
+  latitude     Float?
+  longitude    Float?
+  created_at   DateTime @default(now())
+}
+
+model User {
+  id         Int      @id @default(autoincrement())
+  email      String   @unique
+  role       String
+  created_at DateTime @default(now())
+}
