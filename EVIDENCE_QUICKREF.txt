@@ -1,0 +1,210 @@
+╔══════════════════════════════════════════════════════════════╗
+║           EVIDENCE SYSTEM QUICK REFERENCE                    ║
+║        IPFS + Soroban Proof-of-Funds Verification           ║
+╚══════════════════════════════════════════════════════════════╝
+
+📁 FILES CREATED
+═════════════════════════════════════════════════════════════
+✅ contracts/evidence/src/lib.rs          - Soroban contract
+✅ contracts/evidence/src/test.rs         - Contract tests
+✅ contracts/evidence/Cargo.toml          - Rust dependencies
+✅ backend/src/routes/evidence.ts         - IPFS upload API
+✅ frontend/lib/crypto/hashUtils.ts       - SHA-256 utilities
+✅ frontend/lib/crypto/verifyEvidence.ts  - Verification logic
+✅ frontend/components/EvidenceSubmission.tsx - React component
+✅ EVIDENCE_SYSTEM_COMPLETE.md            - Full documentation
+✅ .env.evidence.example                  - Config template
+✅ test-evidence-api.sh                   - API test script
+
+🔧 QUICK SETUP
+═════════════════════════════════════════════════════════════
+
+1️⃣ Backend Setup
+   cd backend
+   npm install multer axios form-data @types/multer
+   
+   # Configure Pinata
+   echo "PINATA_API_KEY=your_key" >> .env
+   echo "PINATA_SECRET_KEY=your_secret" >> .env
+   
+   npm run dev
+
+2️⃣ Deploy Contract
+   cd contracts/evidence
+   soroban contract build
+   soroban contract deploy \
+     --wasm target/wasm32-unknown-unknown/release/evidence_contract.wasm \
+     --source <SECRET_KEY> \
+     --rpc-url https://soroban-testnet.stellar.org
+
+3️⃣ Test Backend
+   chmod +x test-evidence-api.sh
+   ./test-evidence-api.sh
+
+🌐 API ENDPOINTS
+═════════════════════════════════════════════════════════════
+
+POST /api/evidence/upload
+  → Upload file to IPFS
+  → Returns: { cid, ipfsUrl, size, ... }
+
+GET /api/evidence/retrieve/:cid
+  → Get IPFS gateway URLs
+  → Returns: { cid, gateways[], ... }
+
+GET /api/evidence/health
+  → Check IPFS service status
+  → Returns: { pinata: { status, configured } }
+
+📜 CONTRACT FUNCTIONS
+═════════════════════════════════════════════════════════════
+
+submit_evidence(project_id, cid_hash, issuer)
+  → Store 32-byte hash on-chain
+  → Returns: evidence_index (u64)
+  → Requires: issuer authentication
+
+get_evidence(project_id, evidence_index)
+  → Retrieve evidence record
+  → Returns: Evidence { hash, timestamp, issuer }
+
+verify_evidence(project_id, evidence_index, expected_hash)
+  → Verify hash matches
+  → Returns: bool (true if valid)
+
+get_evidence_count(project_id)
+  → Count evidence for project
+  → Returns: u64
+
+💻 FRONTEND USAGE
+═════════════════════════════════════════════════════════════
+
+// Hash a CID
+import { hashCID, hexToBytes } from '../lib/crypto/hashUtils';
+const hash = await hashCID("QmABC...");
+const bytes = hexToBytes(hash);
+
+// Upload file
+const formData = new FormData();
+formData.append('file', file);
+const { cid } = await fetch('/api/evidence/upload', {
+  method: 'POST',
+  body: formData,
+}).then(r => r.json());
+
+// Verify evidence
+import { verifyEvidence } from '../lib/crypto/verifyEvidence';
+const result = await verifyEvidence(
+  projectId,
+  evidenceIndex,
+  cid,
+  contractAddress
+);
+console.log("Valid?", result.isValid);
+
+// Use React component
+<EvidenceSubmission
+  projectId={1001}
+  issuerAddress="GDEMO..."
+  contractAddress="CCCCC..."
+  onSuccess={(index, cid, hash) => console.log("Done!")}
+/>
+
+🔐 WORKFLOW
+═════════════════════════════════════════════════════════════
+
+NGO SUBMITS EVIDENCE:
+  1. Select file (image/PDF)
+  2. Upload to IPFS via backend → Get CID
+  3. Compute SHA-256(CID) → Get hash
+  4. Submit to Soroban: submit_evidence(project_id, hash)
+  5. Store CID in database linked to evidence_index
+
+DONOR VERIFIES:
+  1. Get CID from database
+  2. Load file from IPFS using CID
+  3. Recompute SHA-256(CID)
+  4. Compare with on-chain hash
+  5. Match? ✅ Donate | Mismatch? ❌ Block
+
+📊 STORAGE COSTS
+═════════════════════════════════════════════════════════════
+
+Traditional (Full File):
+  1MB file = 1,048,576 bytes on-chain = 💰💰💰
+
+With IPFS + Hash:
+  32-byte hash on-chain = 💰 (99.99% cheaper!)
+  File stored on IPFS = Free (decentralized)
+
+🧪 TESTING
+═════════════════════════════════════════════════════════════
+
+# Test contract
+cd contracts/evidence
+cargo test
+
+# Test API
+./test-evidence-api.sh
+
+# Test hash computation
+node -e "
+const crypto = require('crypto');
+const cid = 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG';
+const hash = crypto.createHash('sha256').update(cid).digest('hex');
+console.log('Hash:', hash);
+"
+
+🔥 TROUBLESHOOTING
+═════════════════════════════════════════════════════════════
+
+❌ "Cannot find module 'multer'"
+   → Run: npm install multer axios form-data @types/multer
+
+❌ "Pinata authentication failed"
+   → Check PINATA_API_KEY and PINATA_SECRET_KEY in .env
+   → Test: curl https://api.pinata.cloud/data/testAuthentication
+
+❌ "Hash mismatch"
+   → Verify correct CID is used
+   → File may have been modified after upload
+   → Recompute: hashCID(cid) and compare
+
+❌ "IPFS gateway timeout"
+   → Try alternative gateways:
+     - https://ipfs.io/ipfs/
+     - https://cloudflare-ipfs.com/ipfs/
+     - https://gateway.pinata.cloud/ipfs/
+
+📚 DOCUMENTATION
+═════════════════════════════════════════════════════════════
+
+Full Guide: EVIDENCE_SYSTEM_COMPLETE.md
+  → Architecture diagrams
+  → Complete API reference
+  → Security best practices
+  → Example workflows
+  → Troubleshooting guide
+
+🎯 KEY FEATURES
+═════════════════════════════════════════════════════════════
+
+✅ Tamper-proof: File changes → Hash mismatch
+✅ Cost-optimized: 32 bytes instead of MB
+✅ Decentralized: IPFS prevents censorship
+✅ Verifiable: Anyone can independently verify
+✅ Cryptographic: SHA-256 security
+✅ Scalable: Minimal on-chain storage
+
+🚀 READY TO USE!
+═════════════════════════════════════════════════════════════
+
+All components implemented:
+  ✓ Soroban smart contract
+  ✓ Backend IPFS upload
+  ✓ Frontend utilities
+  ✓ React component
+  ✓ Verification system
+  ✓ Complete documentation
+
+Next: Deploy contract → Configure Pinata → Test workflow

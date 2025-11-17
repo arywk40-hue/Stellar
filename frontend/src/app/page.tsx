@@ -2,7 +2,6 @@
 export const dynamic = 'force-dynamic';
 import nextDynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Tabs from '../components/Tabs';
 import DonationFlow from '../components/DonationFlow';
 import NGOSection from '../components/NGOSection';
@@ -15,7 +14,6 @@ import WalletStatus from '../components/WalletStatus';
 import Chatbot from '../components/Chatbot';
 import Link from 'next/link';
 import { getRole } from '../lib/auth';
-import { useAuth } from '../hooks/useAuth';
 
 const Map = nextDynamic(() => import('../components/Map'), { ssr: false });
 
@@ -23,9 +21,6 @@ export default function Home() {
   const [selectedLatLng, setSelectedLatLng] = useState<{ lat: number; lng: number } | undefined>(undefined);
   const [role, setRole] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(true);
-  const { user, logout } = useAuth();
-  const router = useRouter();
-  
   useEffect(() => { setRole(getRole()); }, []);
 
   const donateTab = (
