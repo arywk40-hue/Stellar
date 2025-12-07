@@ -12,6 +12,8 @@ import { authRouter } from './routes/auth';
 import chatRouter from './routes/chat';
 import { demoRouter } from './routes/demo';
 import evidenceRouter from './routes/evidence';
+import otpRouter from './routes/otp';
+import adminRouter from './routes/admin';
 const useMock = !process.env.DATABASE_URL;
 const mockDonations: any[] = mockDonationsRef;
 
@@ -31,11 +33,16 @@ export function buildApp() {
   app.use(morgan('dev'));
   app.use('/api', limiter);
   app.use('/api', (req, res, next) => {
+    // Allow unauthenticated access to auth and otp endpoints (they handle their own verification)
+    const path = req.path || '';
+    if (path.startsWith('/auth') || path.startsWith('/otp')) return next();
     if (['POST', 'PUT', 'DELETE'].includes(req.method)) return bearerAuth(req, res, next);
     next();
   });
   app.use('/api/auth', authRouter);
   app.use('/api/chat', chatRouter);
+  app.use('/api/otp', otpRouter);
+  app.use('/api/admin', adminRouter);
   app.use('/api/demo', demoRouter);
   app.use('/api/evidence', evidenceRouter);
   // Auth guard example: only allow project creation if bearer token present when JWT_SECRET configured

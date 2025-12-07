@@ -3,6 +3,7 @@ import { getRole, logout } from '../lib/auth';
 import { useEffect, useState } from 'react';
 import Modal from './Modal';
 import AuthForm from './AuthForm';
+import AuthModal from './AuthModal';
 
 export default function SidebarHeader() {
   const [role, setRole] = useState<string | null>(null);
@@ -51,7 +52,7 @@ export default function SidebarHeader() {
       </div>
       
       <Modal open={showDonor} onClose={() => setShowDonor(false)} title="Donor Login">
-        <AuthForm role="donor" />
+        <AuthModal onClose={() => setShowDonor(false)} />
       </Modal>
       <Modal open={showNgo} onClose={() => setShowNgo(false)} title="NGO Login">
         <AuthForm role="ngo" />
