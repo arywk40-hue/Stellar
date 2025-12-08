@@ -3,6 +3,7 @@ import multer from 'multer';
 import FormData from 'form-data';
 import axios from 'axios';
 import fs from 'fs';
+import { requireAuth, requireRole } from '../middleware/authMiddleware';
 
 const router = express.Router();
 
@@ -24,15 +25,9 @@ const upload = multer({
 });
 
 // IPFS Pinning Service Configuration
-// Using Pinata as default - replace with your API keys
 const PINATA_API_KEY = process.env.PINATA_API_KEY || '';
 const PINATA_SECRET_KEY = process.env.PINATA_SECRET_KEY || '';
 const PINATA_BASE_URL = 'https://api.pinata.cloud';
-
-// Alternative: Infura IPFS (uncomment to use)
-// const INFURA_PROJECT_ID = process.env.INFURA_PROJECT_ID || '';
-// const INFURA_PROJECT_SECRET = process.env.INFURA_PROJECT_SECRET || '';
-// const INFURA_BASE_URL = 'https://ipfs.infura.io:5001/api/v0';
 
 /**
  * Upload file to IPFS via Pinata
@@ -43,11 +38,9 @@ const PINATA_BASE_URL = 'https://api.pinata.cloud';
 async function uploadToPinata(filePath: string, originalName: string): Promise<string> {
   const url = `${PINATA_BASE_URL}/pinning/pinFileToIPFS`;
 
-  // Create form data
   const formData = new FormData();
   formData.append('file', fs.createReadStream(filePath));
 
-  // Add metadata
   const metadata = JSON.stringify({
     name: originalName,
     keyvalues: {
@@ -57,9 +50,8 @@ async function uploadToPinata(filePath: string, originalName: string): Promise<s
   });
   formData.append('pinataMetadata', metadata);
 
-  // Add pinning options
   const options = JSON.stringify({
-    cidVersion: 1, // Use CIDv1 for better compatibility
+    cidVersion: 1,
   });
   formData.append('pinataOptions', options);
 
@@ -73,7 +65,7 @@ async function uploadToPinata(filePath: string, originalName: string): Promise<s
       },
     });
 
-    return response.data.IpfsHash; // Returns CID
+    return response.data.IpfsHash;
   } catch (error: any) {
     console.error('Pinata upload error:', error.response?.data || error.message);
     throw new Error('Failed to upload to IPFS via Pinata');
@@ -81,96 +73,77 @@ async function uploadToPinata(filePath: string, originalName: string): Promise<s
 }
 
 /**
- * Alternative: Upload file to IPFS via Infura
- * Uncomment this function if using Infura instead of Pinata
- */
-/*
-async function uploadToInfura(filePath: string): Promise<string> {
-  const url = `${INFURA_BASE_URL}/add`;
-  const auth = Buffer.from(`${INFURA_PROJECT_ID}:${INFURA_PROJECT_SECRET}`).toString('base64');
-
-  const formData = new FormData();
-  formData.append('file', fs.createReadStream(filePath));
-
-  try {
-    const response = await axios.post(url, formData, {
-      headers: {
-        'Content-Type': `multipart/form-data; boundary=${formData.getBoundary()}`,
-        Authorization: `Basic ${auth}`,
-      },
-    });
-
-    return response.data.Hash; // Returns CID
-  } catch (error: any) {
-    console.error('Infura upload error:', error.response?.data || error.message);
-    throw new Error('Failed to upload to IPFS via Infura');
-  }
-}
-*/
-
-/**
  * POST /api/evidence/upload
  * Upload file to IPFS and return CID
+ * ✅ NGO ONLY
  */
-router.post('/upload', upload.single('file'), async (req: Request, res: Response) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({
+router.post(
+  '/upload',
+  requireAuth,
+  requireRole('ngo'),
+  upload.single('file'),
+  async (req: Request, res: Response) => {
+    try {
+      if (!PINATA_API_KEY || !PINATA_SECRET_KEY) {
+        return res.status(500).json({
+          success: false,
+          error: 'Pinata not configured. Set PINATA_API_KEY and PINATA_SECRET_KEY',
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          error: 'No file uploaded',
+        });
+      }
+
+      const { path: filePath, originalname, mimetype, size } = req.file;
+
+      console.log(`📤 Uploading to IPFS: ${originalname} (${size} bytes)`);
+
+      const cid = await uploadToPinata(filePath, originalname);
+
+      fs.unlinkSync(filePath);
+
+      console.log(`✅ Upload successful: ${cid}`);
+
+      return res.status(200).json({
+        success: true,
+        cid,
+        filename: originalname,
+        mimetype,
+        size,
+        ipfsUrl: `https://gateway.pinata.cloud/ipfs/${cid}`,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      console.error('❌ Upload error:', error.message);
+
+      if (req.file?.path) {
+        try {
+          fs.unlinkSync(req.file.path);
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+
+      return res.status(500).json({
         success: false,
-        error: 'No file uploaded',
+        error: error.message || 'Failed to upload file',
       });
     }
-
-    const { path: filePath, originalname, mimetype, size } = req.file;
-
-    console.log(`📤 Uploading to IPFS: ${originalname} (${size} bytes)`);
-
-    // Upload to IPFS
-    const cid = await uploadToPinata(filePath, originalname);
-
-    // Clean up temporary file
-    fs.unlinkSync(filePath);
-
-    console.log(`✅ Upload successful: ${cid}`);
-
-    // Return CID and metadata
-    return res.status(200).json({
-      success: true,
-      cid,
-      filename: originalname,
-      mimetype,
-      size,
-      ipfsUrl: `https://gateway.pinata.cloud/ipfs/${cid}`,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error: any) {
-    console.error('❌ Upload error:', error.message);
-
-    // Clean up temporary file on error
-    if (req.file?.path) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (e) {
-        // Ignore cleanup errors
-      }
-    }
-
-    return res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to upload file',
-    });
   }
-});
+);
 
 /**
  * GET /api/evidence/retrieve/:cid
- * Get file metadata and URL from IPFS
+ * Public: Get file metadata and URL from IPFS
  */
 router.get('/retrieve/:cid', async (req: Request, res: Response) => {
   try {
     const { cid } = req.params;
 
-    // Validate CID format (basic check)
     if (!cid || cid.length < 40) {
       return res.status(400).json({
         success: false,
@@ -178,7 +151,6 @@ router.get('/retrieve/:cid', async (req: Request, res: Response) => {
       });
     }
 
-    // Return IPFS gateway URLs
     return res.status(200).json({
       success: true,
       cid,
@@ -201,14 +173,12 @@ router.get('/retrieve/:cid', async (req: Request, res: Response) => {
 
 /**
  * GET /api/evidence/health
- * Check IPFS service health
+ * Public: Check IPFS service health
  */
-router.get('/health', async (req: Request, res: Response) => {
+router.get('/health', async (_req: Request, res: Response) => {
   try {
-    // Check if API keys are configured
     const isPinataConfigured = !!(PINATA_API_KEY && PINATA_SECRET_KEY);
 
-    // Test Pinata connection
     let pinataStatus = 'not_configured';
     if (isPinataConfigured) {
       try {
@@ -219,7 +189,7 @@ router.get('/health', async (req: Request, res: Response) => {
           },
         });
         pinataStatus = 'connected';
-      } catch (error) {
+      } catch {
         pinataStatus = 'error';
       }
     }

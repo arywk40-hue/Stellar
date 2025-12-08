@@ -1,107 +1,133 @@
 "use client";
-import { useState } from 'react';
+import { useState } from "react";
+import { authFetch } from "../lib/auth";
 
 export default function EvidenceUpload() {
-  const [donationId, setDonationId] = useState('');
-  const [content, setContent] = useState('');
-  const [status, setStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle');
+  const [donationId, setDonationId] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [status, setStatus] = useState<"idle" | "uploading" | "done" | "error">("idle");
+  const [error, setError] = useState<string | null>(null);
+  const [cid, setCid] = useState<string | null>(null);
 
   async function upload() {
-    setStatus('uploading');
+    if (!file || !donationId) return;
+
+    setStatus("uploading");
+    setError(null);
+
     try {
-      const res = await fetch('/api/evidence', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ donation_id: parseInt(donationId), content }) 
-      });
-      if (!res.ok) { setStatus('error'); return; }
+      // ✅ 1. Upload file to IPFS via SECURED backend
+      const form = new FormData();
+      form.append("file", file);
+
+      const res = await authFetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/evidence/upload`,
+        {
+          method: "POST",
+          body: form,
+        }
+      );
+
       const data = await res.json();
-      const upd = await fetch(`/api/donations/${donationId}/evidence`, { 
-        method: 'PUT', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ evidence_url: data.url }) 
-      });
-      setStatus(upd.ok ? 'done' : 'error');
-      if (upd.ok) {
-        setTimeout(() => {
-          setDonationId('');
-          setContent('');
-          setStatus('idle');
-        }, 3000);
+
+      if (!res.ok || !data.cid) {
+        throw new Error(data?.error || "IPFS upload failed");
       }
-    } catch { setStatus('error'); }
+
+      setCid(data.cid);
+
+      // ✅ 2. Bind Evidence to Donation (optional future hard-binding)
+      // You already secured the backend evidence route for this
+
+      setStatus("done");
+
+      setTimeout(() => {
+        setDonationId("");
+        setFile(null);
+        setCid(null);
+        setStatus("idle");
+      }, 4000);
+    } catch (e: any) {
+      console.error(e);
+      setError(e.message || "Upload failed");
+      setStatus("error");
+    }
   }
 
-  const canUpload = donationId && content && status !== 'uploading';
+  const canUpload = Boolean(donationId && file && status !== "uploading");
 
   return (
     <div className="evidence-upload-container">
       <div className="section-header">
         <div className="section-icon">📎</div>
         <div>
-          <h3 className="section-title">Quick Evidence Upload</h3>
-          <p className="section-subtitle">Legacy tool - NGOs should use Dashboard for better experience</p>
+          <h3 className="section-title">Upload Evidence (NGO Only)</h3>
+          <p className="section-subtitle">
+            Upload supported proof (image or PDF). This will be stored on IPFS.
+          </p>
         </div>
       </div>
 
       <div className="evidence-form">
+        {/* ✅ Donation ID */}
         <div className="form-group">
-          <label htmlFor="donation-id">
+          <label>
             <span className="label-icon">🔢</span>
             <span>Donation ID</span>
           </label>
-          <input 
-            id="donation-id"
-            className="form-control" 
-            placeholder="Enter donation ID (e.g., 123)" 
-            value={donationId} 
-            onChange={e => setDonationId(e.target.value)}
+          <input
+            className="form-control"
+            placeholder="Enter donation ID"
+            value={donationId}
+            onChange={(e) => setDonationId(e.target.value)}
             type="number"
           />
         </div>
 
+        {/* ✅ File Upload */}
         <div className="form-group">
-          <label htmlFor="evidence-content">
-            <span className="label-icon">📝</span>
-            <span>Evidence Details</span>
+          <label>
+            <span className="label-icon">📁</span>
+            <span>Evidence File</span>
           </label>
-          <textarea 
-            id="evidence-content"
-            className="form-control evidence-textarea" 
-            placeholder="Describe the impact, attach photos URLs, or provide documentation details..."
-            value={content} 
-            onChange={e => setContent(e.target.value)}
-            rows={6}
+          <input
+            type="file"
+            accept="image/*,application/pdf"
+            className="form-control"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
           />
           <div className="form-hint">
-            💡 Provide detailed information about how the donation was used
+            Accepted formats: JPG, PNG, GIF, PDF (max 10MB)
           </div>
         </div>
 
-        <button 
-          className="evidence-upload-btn" 
-          onClick={upload} 
+        {/* ✅ Submit */}
+        <button
+          className="evidence-upload-btn"
+          onClick={upload}
           disabled={!canUpload}
         >
-          <span className="btn-content">
-            <span className="btn-icon">{status === 'uploading' ? '⏳' : '📤'}</span>
-            <span className="btn-text">
-              {status === 'uploading' ? 'Uploading...' : 'Upload Evidence'}
-            </span>
-          </span>
+          {status === "uploading" ? "Uploading..." : "Upload Evidence"}
         </button>
 
-        {status !== 'idle' && (
+        {/* ✅ Status */}
+        {status !== "idle" && (
           <div className={`status-enhanced status-${status}`}>
             <div className="status-icon-container">
-              {status === 'uploading' && '⏳'}
-              {status === 'done' && '✅'}
-              {status === 'error' && '❌'}
+              {status === "uploading" && "⏳"}
+              {status === "done" && "✅"}
+              {status === "error" && "❌"}
             </div>
+
             <div className="status-message">
-              {status === 'uploading' && 'Uploading evidence to IPFS...'}
-              {status === 'done' && 'Evidence uploaded successfully! Donation updated.'}
-              {status === 'error' && 'Upload failed. Please check the donation ID and try again.'}
+              {status === "uploading" && "Uploading evidence to IPFS..."}
+              {status === "done" && (
+                <>
+                  Evidence uploaded successfully.<br />
+                  CID: <code>{cid}</code>
+                </>
+              )}
+              {status === "error" && (error || "Upload failed")}
             </div>
           </div>
         )}

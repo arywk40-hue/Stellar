@@ -15,6 +15,11 @@ const projects_1 = require("./routes/projects");
 const ipfs_1 = require("./uploads/ipfs");
 const db_1 = require("./db");
 const auth_1 = require("./routes/auth");
+const chat_1 = __importDefault(require("./routes/chat"));
+const demo_1 = require("./routes/demo");
+const evidence_1 = __importDefault(require("./routes/evidence"));
+const otp_1 = __importDefault(require("./routes/otp"));
+const admin_1 = __importDefault(require("./routes/admin"));
 const useMock = !process.env.DATABASE_URL;
 const mockDonations = donations_1.mockDonationsRef;
 function bearerAuth(req, res, next) {
@@ -34,11 +39,20 @@ function buildApp() {
     app.use((0, morgan_1.default)('dev'));
     app.use('/api', limiter);
     app.use('/api', (req, res, next) => {
+        // Allow unauthenticated access to auth and otp endpoints (they handle their own verification)
+        const path = req.path || '';
+        if (path.startsWith('/auth') || path.startsWith('/otp'))
+            return next();
         if (['POST', 'PUT', 'DELETE'].includes(req.method))
             return bearerAuth(req, res, next);
         next();
     });
     app.use('/api/auth', auth_1.authRouter);
+    app.use('/api/chat', chat_1.default);
+    app.use('/api/otp', otp_1.default);
+    app.use('/api/admin', admin_1.default);
+    app.use('/api/demo', demo_1.demoRouter);
+    app.use('/api/evidence', evidence_1.default);
     // Auth guard example: only allow project creation if bearer token present when JWT_SECRET configured
     app.use('/api/projects', (req, res, next) => {
         if (process.env.JWT_SECRET) {

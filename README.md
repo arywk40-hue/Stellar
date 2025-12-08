@@ -161,6 +161,19 @@ curl http://localhost:4000/api/demo/status
 cd contracts/evidence && cargo test
 ```
 
+### Run all checks locally
+
+```bash
+# Backend tests
+cd backend && npm ci && npm test
+
+# Frontend build + tests
+cd ../frontend && npm ci && npm run build && npm test
+
+# Functions build
+cd ../functions && npm ci && npm run build
+```
+
 ---
 
 ## 📊 System Stats

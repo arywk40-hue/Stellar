@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.authRouter = void 0;
 const express_1 = require("express");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const db_1 = require("../db");
 const router = (0, express_1.Router)();
 const codes = new Map();
 router.post('/start', (req, res) => {
@@ -26,6 +27,13 @@ router.post('/verify', (req, res) => {
     if (!stored || stored !== code)
         return res.status(401).json({ error: 'invalid-code' });
     codes.delete(key);
+    try {
+        if (process.env.DATABASE_URL) {
+            // @ts-ignore User model may need migration
+            await(db_1.prisma).user.upsert({ where: { email }, update: { role }, create: { email, role } });
+        }
+    }
+    catch (e) { /* ignore persistence errors in mock mode */ }
     const token = jsonwebtoken_1.default.sign({ sub: email, role }, process.env.JWT_SECRET || 'dev', { expiresIn: '2h' });
     res.json({ token });
 });

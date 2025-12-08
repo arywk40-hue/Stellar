@@ -4,8 +4,9 @@ exports.ngosRouter = void 0;
 const express_1 = require("express");
 const zod_1 = require("zod");
 const db_1 = require("../db");
+const demo_data_1 = require("../demo-data");
 const useMock = !process.env.DATABASE_URL;
-const mockStore = [];
+const mockStore = [...demo_data_1.DEMO_NGOS]; // Pre-populate with demo data
 const router = (0, express_1.Router)();
 const NGOSchema = zod_1.z.object({
     name: zod_1.z.string(),
